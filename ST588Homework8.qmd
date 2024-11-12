@@ -1,0 +1,153 @@
+---
+title: "ST588 Homework 8"
+author: "Matthew Bray"
+format: html
+editor: visual
+---
+
+##HW 8: Basic Modeling Practice
+### First order of business...load libraries that are needed for the project:
+```{r}
+library(readr)
+library(tidyverse)
+library(lubridate)
+```
+### Reading Data
+We'll read in the data using `readr::read_csv`.
+```{r}
+data <- read_csv("SeoulBikeData.csv")
+```
+### EDA
+Next, we'll do some basic EDA...
+
+1) Check for missingness by summing columns where the data `is.na`.
+```{r}
+colSums(is.na(data))
+```
+It appears there are no missing data.
+
+Next, we'll check the variable (column) types and see if the data make sense (numerical values have a rational mean and other stats), and that categorical variables have unique values.
+```{r}
+str(data)
+```
+The data appears "normal", except date is a character and hour appears like it could be a count.  We can check the numeric variables by creating numeric summaries to see if they make sense.  We'll use the `summary()` function to get 5 number summary for numeric values:
+```{r}
+summary(data)
+```
+This looks like hour is a real number and the view in the `str()` function output may have been coincidental, but I am still unsure what "hour" is.  We can also look at the character variables to see how many unique values there may be in each category by creating frequency tables.
+```{r}
+table(data$Seasons)
+```
+Seasons look reasonable, there are the four standard seasons in roughly equal proportion.
+
+```{r}
+table(data$Holiday)
+```
+Holiday also appears reasonable, with the only two logical possibilities, and with fewer holidays than non-holidays, which is sadly the reality.
+
+```{r}
+data2 <- data |>
+  rename("functioningDay" = "Functioning Day")
+
+table(data2$functioningDay)
+```
+This seems to make sense, there are two classes.
+
+We'll next conver the date from a character variable to a date using `lubridate()`, turn the other character variables into factors, and rename all the variables for consistent naming.  We'll use the `lubridate` package and the `dplyr` package.
+```{r}
+names(data)
+
+#rename using names()fuction to help with renaming non-standard variables
+names(data) <- c("date",
+                 "rentedBikeCount",
+                 "hour",
+                 "tempC",
+                 "humidityPct",
+                 "windM_S",
+                 "vis",
+                 "dewPointTempC",
+                 "solarRadiation",
+                 "rainfallmm",
+                 "snowfallcm",
+                 "seasons",
+                 "holiday",
+                 "functioningDay")
+#coerce date from chr to date formt using lubridate::dmy
+data$date <- dmy(data$date)
+
+#create list of variables to coerce to factors
+factors <- c("seasons", "holiday", "functioningDay")
+#coerce to factor using list above
+data3 <-data |>
+  mutate_at(factors, factor)
+#check to see conversions were successful
+head(data3)
+```
+The variable transformations were successful.  Now, we'll move on with some more exploration of this updated data.
+
+##Summary Statistics Across Bike Rental Count and Categorical Variables:
+We'll start by grouping by `rentedBikeCount`:
+```{r}
+seasonsStat <- data3 |>
+  group_by(seasons) |>
+  summarise(
+    count = n(),
+    mean = mean(rentedBikeCount),
+    sd = sd(rentedBikeCount),
+    min = min(rentedBikeCount),
+    max = max(rentedBikeCount)
+  )
+seasonsStat
+```
+These statistics are a little difficult to make sense of because they represent the number of bikes rented per certain hour of each date within the corresponding season, these values do not represent the average number of bikes rented per season.  However, it is intuitive that more bikes are rented per certain hour on a given date during the summer vs. winter, as the weather is typically more conducive to bike riding in the summer, thereby increasing demand.
+
+Let's look at similar summary stats for other categorical groupings, starting with Holiday...
+```{r}
+holidayStat <- data3 |>
+  group_by(holiday) |>
+  summarise(
+    count = n(),
+    mean = mean(rentedBikeCount),
+    sd = sd(rentedBikeCount),
+    min = min(rentedBikeCount),
+    max = max(rentedBikeCount)
+  )
+holidayStat
+```
+...then Functioning Day:
+```{r}
+funDayStat <- data3 |>
+  group_by(functioningDay) |>
+  summarise(
+    count = n(),
+    mean = mean(rentedBikeCount),
+    sd = sd(rentedBikeCount),
+    min = min(rentedBikeCount),
+    max = max(rentedBikeCount)
+  )
+funDayStat
+```
+It looks like no bikes were rented on Non-functional days.  I'm still not sure what a "Non-Functional" Day is, but we can remove the Non-Functioning Days from the dataset, since they don't provide much useful information other than people don't rent bikes on non-functional days.
+
+We'll subset the data to remove `"functioningDay" == "No"`.
+```{r}
+data4 <- data3 |>
+  filter(!functioningDay == "No")
+#check to make sure the correct values were removed:
+funDayStatYes <- data4 |>
+  group_by(functioningDay) |>
+  summarise(
+    count = n(),
+    mean = mean(rentedBikeCount),
+    sd = sd(rentedBikeCount),
+    min = min(rentedBikeCount),
+    max = max(rentedBikeCount)
+  )
+funDayStatYes
+```
+Ok, good.  The stats for `"functioningDay"` remain the same after subsetting.
+
+
+
+
+
