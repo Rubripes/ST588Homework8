@@ -145,7 +145,52 @@ funDayStatYes <- data4 |>
   )
 funDayStatYes
 ```
-Ok, good.  The stats for `"functioningDay"` remain the same after subsetting.
+Ok, good news.  The stats for `"functioningDay"` remain the same after subsetting.
+
+Next, we'll summarize across the hours so that each day has one observation associated with it.
+```{r}
+data5 <- data4 |>
+  group_by(date, seasons, holiday) |>
+  summarise(n=n(),
+            sumCount = sum(rentedBikeCount),
+            sumRain = sum(rainfallmm),
+            rumSnow = sum(snowfallcm),
+            meanCount = mean(rentedBikeCount),
+            meanRain = mean(rainfallmm),
+            meanSnow = mean(snowfallcm))
+data5
+```
+We'll take this new summary dataset and calculate the same summary stats as before.  By Season:
+```{r}
+seasonsStat1 <- data5 |>
+  group_by(seasons) |>
+  summarise(
+    count = n(),
+    mean = mean(sumCount),
+    sd = sd(sumCount),
+    min = min(sumCount),
+    max = max(sumCount)
+  )
+seasonsStat1
+```
+This must be a large city...36149 rentals in a single day is a lot of bikes!
+
+
+By Holiday:
+```{r}
+holidayStat1 <- data5 |>
+  group_by(holiday) |>
+  summarise(
+    count = n(),
+    mean = mean(sumCount),
+    sd = sd(sumCount),
+    min = min(sumCount),
+    max = max(sumCount)
+  )
+holidayStat1
+```
+There is a large difference in sample size between Holiday and No Holiday.
+
 
 
 
