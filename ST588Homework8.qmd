@@ -11,6 +11,8 @@ editor: visual
 library(readr)
 library(tidyverse)
 library(lubridate)
+library(gganimate)
+library(gifski)
 ```
 ### Reading Data
 We'll read in the data using `readr::read_csv`.
@@ -101,6 +103,12 @@ seasonsStat
 ```
 These statistics are a little difficult to make sense of because they represent the number of bikes rented per certain hour of each date within the corresponding season, these values do not represent the average number of bikes rented per season.  However, it is intuitive that more bikes are rented per certain hour on a given date during the summer vs. winter, as the weather is typically more conducive to bike riding in the summer, thereby increasing demand.
 
+Are hours `1:24`?
+```{r}
+unique(data$hour)
+```
+Close...`0:23`.  This looks like a 24 hour clock for tabulating a statndardized time window for rentals each day.
+
 Let's look at similar summary stats for other categorical groupings, starting with Holiday...
 ```{r}
 holidayStat <- data3 |>
@@ -154,7 +162,7 @@ data5 <- data4 |>
   summarise(n=n(),
             sumCount = sum(rentedBikeCount),
             sumRain = sum(rainfallmm),
-            rumSnow = sum(snowfallcm),
+            sumSnow = sum(snowfallcm),
             meanCount = mean(rentedBikeCount),
             meanRain = mean(rainfallmm),
             meanSnow = mean(snowfallcm))
@@ -190,6 +198,32 @@ holidayStat1 <- data5 |>
 holidayStat1
 ```
 There is a large difference in sample size between Holiday and No Holiday.
+
+### EDA Graphics
+Let's create some plots to help visualize the data.
+```{r}
+#plot snow vs. rain and color points by season.
+ggplot(data5, aes(sumRain, sumSnow, size = sumCount, colour = seasons)) +
+  geom_point(alpha = 0.7, show.legend = TRUE) +
+  scale_size(range = c(2, 12)) +
+  facet_wrap(~holiday) +
+  # Here comes the gganimate specific bits
+  labs(title = 'Rain and Snow Impacts on Daily Rental Volume', x = 'Sum Daily Rain', y = 'Sum Daily Snow') 
+```
+It seems that snow does have a lot of appeal for bike riding.  Rain appears to be tolerable, but the decreasing size of the rental counts relative to increasing total daily rainfall makes sense...people just don't really want to get soaked while riding.  There also are not many days where it both rains and snows.  Snow seems to have the biggest impact on rental numbers in this visualization, and the trends hold between holidays and non-holidays.
+
+Next, let's look weather totals vs. rental volume seperately by rain or snow:
+```{r}
+#plot snow vs. rain and color points by season.
+ggplot(data5, aes(sumRain, sumCount, colour = seasons)) +
+  geom_point(alpha = 0.7, show.legend = TRUE) +
+  geom_smooth(method = "LM", fill = NA) +
+  scale_size(range = c(2, 12)) +
+  facet_wrap(~holiday) +
+  # Here comes the gganimate specific bits
+  labs(title = 'Rain Impacts on Daily Rental Volume', x = 'Sum Daily Rain', y = 'Daily Rental Volume') 
+```
+
 
 
 
