@@ -160,8 +160,7 @@ Next, we'll summarize across the hours so that each day has one observation asso
 ```{r}
 data5 <- data4 |>
   group_by(date, seasons, holiday) |>
-  summarise(n=n(),
-            sumCount = sum(rentedBikeCount),
+  summarise(sumCount = sum(rentedBikeCount),
             sumRain = sum(rainfallmm),
             sumSnow = sum(snowfallcm),
             meanCount = mean(rentedBikeCount),
@@ -229,7 +228,6 @@ What about snow only?
 ggplot(data5, aes(sumSnow, sumCount, colour = seasons)) +
   geom_point(alpha = 0.7, show.legend = TRUE) +
   scale_size(range = c(2, 12)) +
-  # Here comes the gganimate specific bits
   labs(title = 'Snow Impacts on Daily Rental Volume', x = 'Sum Daily Snow', y = 'Daily Rental Volume') 
 ```
 It obviously doesn't snow much in the summer....
@@ -287,7 +285,31 @@ folds[[10]]
 Yes!  There are 29 observations in Fold #10!
 
 ##Fitting MLR Models
+We'll create 3 recipes to preprocess the data...
 
+###Recipe 1
+We'll change the `role` of date, create a weekday/weekend factor variable from the date, standardize the numberic variables, and create dummy variables for `seasons`, `holiday`, and the new variables.
+```{r}
+bike_rec1 <- 
+  recipe(sumCount ~ ., data=rental_train) %>%
+  update_role(date, new_role = "ID") %>%
+  step_date(date, features = "dow") %>%
+  step_mutate(date, 
+              "day" = factor(if_else(date %in% c("Saturday", "Sunday"), "weekend", "weekday"))) %>%
+  #scale the numerical data by normalizing to max value
+  mutate("normCount" = "sumCount"/!!max(sumCount),
+         "normRain" = "sumRain"/!!max(sumRain),
+         "normSnow" = "sumSnow"/!!max(sumSnow),
+         "normMeanCount" = "meanCount"/!!max(meanCount),
+         "normMeanRain" = "meanRain"/!!max("meanRain"),
+         "normMeanSnow" = "meanSnow"/!!max("meanSnow")) %>%
+  step_dummy(all_nominal_predictors())
+```
+
+We'll next create the same recipe, with interaction terms between seasons and holiday, seasons and temp, and temp and rainfall.
+```{r}
+
+```
 
 
 
