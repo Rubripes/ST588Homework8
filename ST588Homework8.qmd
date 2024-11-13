@@ -163,9 +163,12 @@ data5 <- data4 |>
   summarise(sumCount = sum(rentedBikeCount),
             sumRain = sum(rainfallmm),
             sumSnow = sum(snowfallcm),
-            meanCount = mean(rentedBikeCount),
-            meanRain = mean(rainfallmm),
-            meanSnow = mean(snowfallcm))
+            meanTemp = mean(tempC),
+            meanHumidity = mean(humidityPct),
+            meanWind = mean(windM_S),
+            meanVis = mean(vis),
+            meanDP_C = mean(dewPointTempC),
+            meanSR = mean(solarRadiation))
 data5
 ```
 We'll take this new summary dataset and calculate the same summary stats as before.  By Season:
@@ -297,18 +300,39 @@ bike_rec1 <-
   step_mutate(date, 
               "day" = factor(if_else(date %in% c("Saturday", "Sunday"), "weekend", "weekday"))) %>%
   #scale the numerical data by normalizing to max value
-  mutate("normCount" = "sumCount"/!!max(sumCount),
-         "normRain" = "sumRain"/!!max(sumRain),
-         "normSnow" = "sumSnow"/!!max(sumSnow),
-         "normMeanCount" = "meanCount"/!!max(meanCount),
-         "normMeanRain" = "meanRain"/!!max("meanRain"),
-         "normMeanSnow" = "meanSnow"/!!max("meanSnow")) %>%
+  step_mutate("normCount" = "sumCount"/!!max("sumCount"),
+         "normRain" = "sumRain"/!!max("sumRain"),
+         "normSnow" = "sumSnow"/!!max("sumSnow"),
+         "normTemp" = "meanTemp"/!!max("meanTemp"),
+         "normMeanHumidity" = "meanHumidity"/!!max("meanHumidity"),
+         "normMeanWind" = "meanWind"/!!max("meanWind"),
+         "normMeanVis" = "meanVis"/!!max("meanVis"),
+         "normMeanDP_C" = "meanDP_C"/!!max("meanDP_C"),
+         "normMeanSR" = "meanSR"/!!max("meanSR"),
+         keep_original_cols=FALSE) %>%
   step_dummy(all_nominal_predictors())
 ```
 
 We'll next create the same recipe, with interaction terms between seasons and holiday, seasons and temp, and temp and rainfall.
 ```{r}
-
+bike_rec2 <- 
+  recipe(sumCount ~ ., data=rental_train) %>%
+  update_role(date, new_role = "ID") %>%
+  step_date(date, features = "dow") %>%
+  step_mutate(date, 
+              "day" = factor(if_else(date %in% c("Saturday", "Sunday"), "weekend", "weekday"))) %>%
+  #scale the numerical data by normalizing to max value
+  step_mutate("normCount" = "sumCount"/!!max("sumCount"),
+         "normRain" = "sumRain"/!!max("sumRain"),
+         "normSnow" = "sumSnow"/!!max("sumSnow"),
+         "normTemp" = "meanTemp"/!!max("meanTemp"),
+         "normMeanHumidity" = "meanHumidity"/!!max("meanHumidity"),
+         "normMeanWind" = "meanWind"/!!max("meanWind"),
+         "normMeanVis" = "meanVis"/!!max("meanVis"),
+         "normMeanDP_C" = "meanDP_C"/!!max("meanDP_C"),
+         "normMeanSR" = "meanSR"/!!max("meanSR"),
+         keep_original_cols=FALSE) %>%
+  step_dummy(all_nominal_predictors())
 ```
 
 
