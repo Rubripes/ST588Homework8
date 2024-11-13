@@ -3,6 +3,7 @@ title: "ST588 Homework 8"
 author: "Matthew Bray"
 format: html
 editor: visual
+code-overflow: wrap
 ---
 
 ##HW 8: Basic Modeling Practice
@@ -12,7 +13,7 @@ library(readr)
 library(tidyverse)
 library(lubridate)
 library(gganimate)
-library(gifski)
+library(tidymodels)
 ```
 ### Reading Data
 We'll read in the data using `readr::read_csv`.
@@ -210,19 +211,82 @@ ggplot(data5, aes(sumRain, sumSnow, size = sumCount, colour = seasons)) +
   # Here comes the gganimate specific bits
   labs(title = 'Rain and Snow Impacts on Daily Rental Volume', x = 'Sum Daily Rain', y = 'Sum Daily Snow') 
 ```
-It seems that snow does have a lot of appeal for bike riding.  Rain appears to be tolerable, but the decreasing size of the rental counts relative to increasing total daily rainfall makes sense...people just don't really want to get soaked while riding.  There also are not many days where it both rains and snows.  Snow seems to have the biggest impact on rental numbers in this visualization, and the trends hold between holidays and non-holidays.
+It seems that snow does not have a lot of appeal for bike riding.  Rain appears to be tolerable, but the decreasing size of the rental counts relative to increasing total daily rainfall makes sense...people just don't really want to get soaked while riding.  There also are not many days where it both rains and snows.  Snow seems to have the biggest impact on rental numbers in this visualization, and the trends hold between holidays and non-holidays.
 
 Next, let's look weather totals vs. rental volume seperately by rain or snow:
 ```{r}
 #plot snow vs. rain and color points by season.
 ggplot(data5, aes(sumRain, sumCount, colour = seasons)) +
   geom_point(alpha = 0.7, show.legend = TRUE) +
-  geom_smooth(method = "LM", fill = NA) +
   scale_size(range = c(2, 12)) +
-  facet_wrap(~holiday) +
   # Here comes the gganimate specific bits
   labs(title = 'Rain Impacts on Daily Rental Volume', x = 'Sum Daily Rain', y = 'Daily Rental Volume') 
 ```
+There is an apparent relationship between season and rental volume, with the warmer seasons (and dryer seasons/days) tending to exhibit the highest rental volume.
+
+What about snow only?
+```{r}
+ggplot(data5, aes(sumSnow, sumCount, colour = seasons)) +
+  geom_point(alpha = 0.7, show.legend = TRUE) +
+  scale_size(range = c(2, 12)) +
+  # Here comes the gganimate specific bits
+  labs(title = 'Snow Impacts on Daily Rental Volume', x = 'Sum Daily Snow', y = 'Daily Rental Volume') 
+```
+It obviously doesn't snow much in the summer....
+Appreciable snowfall depresses the rental volume quite a lot!
+
+## Split the Data
+We'll split the data into a training and test set (75/25).  We'll use the `strata` argument to stratify the split on the `seasons` variable.
+
+First, we'll use the `initial_split()`, `training()`, and `testing()` functions to create the splits:
+```{r}
+set.seed(10)
+rental_split <- initial_split(data5, prop = 0.75, strata ="seasons")
+rental_train <- training(rental_split)
+rental_test <- testing(rental_split)
+rental_train
+```
+263/353 = ~ 75%, so that looks like we successfully created the right proportions for our training/test datasets.
+
+263 rows in the training dataset, which is not evenly divisible by 10.  Each fold will have 26 observations, and one fold with have 29.
+```{r}
+size_fold <- floor(nrow(rental_train)/10)
+size_fold
+```
+Next, we'll set a seed and randomly sample the folds into a list.
+```{r}
+set.seed(10)
+random_indices <- sample(1:nrow(rental_train), size = nrow(rental_train), replace=FALSE)
+head(random_indices)
+```
+We can see above the first index of each fold.
+
+Next, we'll create a list in which to save our folds, then cycle through the random indices vector to place the observations from each fold in the list accordingly.
+
+```{r}
+folds <- list()
+
+for(i in 1:10){
+  if (i<10) {
+    fold_index <- seq(from = (i-1)*size_fold + 1, to = i*size_fold, by=1)
+    folds[[i]] <- rental_train[random_indices[fold_index], ]
+  } else {
+    fold_index <- seq(from = (i-1)*size_fold +1, to=length(random_indices), by =1)
+    folds[[i]] <- rental_train[random_indices[fold_index], ]
+  }
+}
+
+#check out the first fold:
+folds[[1]]
+```
+
+Let's check out the 10th fold...does it contain 29 observations?
+```{r}
+folds[[10]]
+```
+Yes!  There are 29 observations in Fold #10!
+
+##Fitting MLR Models
 
 
 
