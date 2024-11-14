@@ -341,6 +341,31 @@ bike_rec2 <-
 
 bike_rec2
 ```
+On to recipe three that includes quadratic terms:
+```{r}
+bike_rec3 <- 
+  recipe(sumCount ~ ., data=rental_train) %>%
+  update_role(date, new_role = "ID") %>%
+  step_mutate("date" = weekdays(date)) %>%
+  step_mutate("date" = factor(if_else(date %in% c("Saturday", "Sunday"), "weekend", "weekday"))) %>%
+  #scale the numerical data by normalizing to max value
+  #step_mutate("normRain" = "sumRain"/!!max("sumRain"),
+  #       "normSnow" = "sumSnow"/!!max("sumSnow"),
+  #       "normTemp" = "meanTemp"/!!max("meanTemp"),
+  #       "normMeanHumidity" = "meanHumidity"/!!max("meanHumidity"),
+  #       "normMeanWind" = "meanWind"/!!max("meanWind"),
+  #       "normMeanVis" = "meanVis"/!!max("meanVis"),
+  #       "normMeanDP_C" = "meanDP_C"/!!max("meanDP_C"),
+  #       "normMeanSR" = "meanSR"/!!max("meanSR"),
+  #       keep_original_cols=FALSE) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_normalize(starts_with(c("sum", "mean")), -all_date_predictors(), -all_outcomes()) %>%
+  step_poly(all_numeric_predictors(), -starts_with(c("seasons", "holiday")), degree = 2) %>%
+  prep(training=rental_train) %>%
+  bake(rental_train)
+
+bike_rec3
+```
 
 
 
