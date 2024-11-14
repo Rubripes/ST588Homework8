@@ -5,6 +5,9 @@ format: html
 editor: visual
 code-overflow: wrap
 ---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
 
 ##HW 8: Basic Modeling Practice
 ### First order of business...load libraries that are needed for the project:
@@ -14,6 +17,7 @@ library(tidyverse)
 library(lubridate)
 library(gganimate)
 library(tidymodels)
+library(parsnip)
 ```
 ### Reading Data
 We'll read in the data using `readr::read_csv`.
@@ -210,7 +214,6 @@ ggplot(data5, aes(sumRain, sumSnow, size = sumCount, colour = seasons)) +
   geom_point(alpha = 0.7, show.legend = TRUE) +
   scale_size(range = c(2, 12)) +
   facet_wrap(~holiday) +
-  # Here comes the gganimate specific bits
   labs(title = 'Rain and Snow Impacts on Daily Rental Volume', x = 'Sum Daily Rain', y = 'Sum Daily Snow') 
 ```
 It seems that snow does not have a lot of appeal for bike riding.  Rain appears to be tolerable, but the decreasing size of the rental counts relative to increasing total daily rainfall makes sense...people just don't really want to get soaked while riding.  There also are not many days where it both rains and snows.  Snow seems to have the biggest impact on rental numbers in this visualization, and the trends hold between holidays and non-holidays.
@@ -221,7 +224,6 @@ Next, let's look weather totals vs. rental volume seperately by rain or snow:
 ggplot(data5, aes(sumRain, sumCount, colour = seasons)) +
   geom_point(alpha = 0.7, show.legend = TRUE) +
   scale_size(range = c(2, 12)) +
-  # Here comes the gganimate specific bits
   labs(title = 'Rain Impacts on Daily Rental Volume', x = 'Sum Daily Rain', y = 'Daily Rental Volume') 
 ```
 There is an apparent relationship between season and rental volume, with the warmer seasons (and dryer seasons/days) tending to exhibit the highest rental volume.
@@ -242,6 +244,7 @@ We'll split the data into a training and test set (75/25).  We'll use the `strat
 First, we'll use the `initial_split()`, `training()`, and `testing()` functions to create the splits:
 ```{r}
 set.seed(10)
+#create split with 75% data in training set and 25% in test set, and name the sets
 rental_split <- initial_split(data5, prop = 0.75, strata ="seasons")
 rental_train <- training(rental_split)
 rental_test <- testing(rental_split)
@@ -251,12 +254,14 @@ rental_train
 
 263 rows in the training dataset, which is not evenly divisible by 10.  Each fold will have 26 observations, and one fold with have 29.
 ```{r}
+#calculate fold size by dividing by number of folds (10)
 size_fold <- floor(nrow(rental_train)/10)
 size_fold
 ```
 Next, we'll set a seed and randomly sample the folds into a list.
 ```{r}
 set.seed(10)
+#randomly create starting indices for each fold
 random_indices <- sample(1:nrow(rental_train), size = nrow(rental_train), replace=FALSE)
 head(random_indices)
 ```
@@ -287,33 +292,28 @@ folds[[10]]
 ```
 Yes!  There are 29 observations in Fold #10!
 
-##Fitting MLR Models
+## Fitting MLR Models
 We'll create 3 recipes to preprocess the data...
 
-###Recipe 1
+### Recipe 1
 We'll change the `role` of date, create a weekday/weekend factor variable from the date, standardize the numberic variables, and create dummy variables for `seasons`, `holiday`, and the new variables.
 ```{r}
 bike_rec1 <- 
   recipe(sumCount ~ ., data=rental_train) %>%
+  #change date to an ID role so that it is not included in fit, but is included in dataset
   update_role(date, new_role = "ID") %>%
+  #change date to day of the week
   step_mutate("date" = weekdays(date)) %>%
+  #transform day of week into week/weekend factor for inclusion in model fitting
   step_mutate("date" = factor(if_else(date %in% c("Saturday", "Sunday"), "weekend", "weekday"))) %>%
-  #scale the numerical data by normalizing to max value
-  #step_mutate("normRain" = "sumRain"/!!max("sumRain"),
-  #       "normSnow" = "sumSnow"/!!max("sumSnow"),
-  #       "normTemp" = "meanTemp"/!!max("meanTemp"),
-  #       "normMeanHumidity" = "meanHumidity"/!!max("meanHumidity"),
-  #       "normMeanWind" = "meanWind"/!!max("meanWind"),
-  #       "normMeanVis" = "meanVis"/!!max("meanVis"),
-  #       "normMeanDP_C" = "meanDP_C"/!!max("meanDP_C"),
-  #       "normMeanSR" = "meanSR"/!!max("meanSR"),
-  #       keep_original_cols=FALSE) %>%
+  #make all nominal predictors into dummy variables
   step_dummy(all_nominal_predictors()) %>%
-  step_normalize(starts_with(c("sum", "mean")), -all_date_predictors(), -all_outcomes()) %>%
-  prep(training=rental_train) %>%
-  bake(rental_train)
+  #cneter and scale numeric variables, except do not include dummy variables, dates, or outcomes
+  step_normalize(starts_with(c("sum", "mean")), -all_date_predictors(), -all_outcomes()) #%>%
+#  prep(training=rental_train) %>%
+#  bake(rental_train)
 
-bike_rec1
+#bike_rec1
 ```
 
 We'll next create the same recipe, with interaction terms between seasons and holiday, seasons and temp, and temp and rainfall.
@@ -323,24 +323,16 @@ bike_rec2 <-
   update_role(date, new_role = "ID") %>%
   step_mutate("date" = weekdays(date)) %>%
   step_mutate("date" = factor(if_else(date %in% c("Saturday", "Sunday"), "weekend", "weekday"))) %>%
-  #scale the numerical data by normalizing to max value
-  #step_mutate("normRain" = "sumRain"/!!max("sumRain"),
-  #       "normSnow" = "sumSnow"/!!max("sumSnow"),
-  #       "normTemp" = "meanTemp"/!!max("meanTemp"),
-  #       "normMeanHumidity" = "meanHumidity"/!!max("meanHumidity"),
-  #       "normMeanWind" = "meanWind"/!!max("meanWind"),
-  #       "normMeanVis" = "meanVis"/!!max("meanVis"),
-  #       "normMeanDP_C" = "meanDP_C"/!!max("meanDP_C"),
-  #       "normMeanSR" = "meanSR"/!!max("meanSR"),
-  #       keep_original_cols=FALSE) %>%
   step_dummy(all_nominal_predictors()) %>%
   step_normalize(starts_with(c("sum", "mean")), -all_date_predictors(), -all_outcomes()) %>%
-  step_interact(terms = ~ starts_with("seasons"):starts_with("holiday") + starts_with("seasons"):meanTemp + meanTemp:sumRain) %>%
-  prep(training=rental_train) %>%
-  bake(rental_train)
+  step_interact(terms = ~ starts_with("seasons"):starts_with("holiday") + starts_with("seasons"):meanTemp + meanTemp:sumRain) #%>%
+#  prep(training=rental_train) %>%
+#  bake(rental_train)
 
-bike_rec2
+#bike_rec2
 ```
+
+
 On to recipe three that includes quadratic terms:
 ```{r}
 bike_rec3 <- 
@@ -348,27 +340,111 @@ bike_rec3 <-
   update_role(date, new_role = "ID") %>%
   step_mutate("date" = weekdays(date)) %>%
   step_mutate("date" = factor(if_else(date %in% c("Saturday", "Sunday"), "weekend", "weekday"))) %>%
-  #scale the numerical data by normalizing to max value
-  #step_mutate("normRain" = "sumRain"/!!max("sumRain"),
-  #       "normSnow" = "sumSnow"/!!max("sumSnow"),
-  #       "normTemp" = "meanTemp"/!!max("meanTemp"),
-  #       "normMeanHumidity" = "meanHumidity"/!!max("meanHumidity"),
-  #       "normMeanWind" = "meanWind"/!!max("meanWind"),
-  #       "normMeanVis" = "meanVis"/!!max("meanVis"),
-  #       "normMeanDP_C" = "meanDP_C"/!!max("meanDP_C"),
-  #       "normMeanSR" = "meanSR"/!!max("meanSR"),
-  #       keep_original_cols=FALSE) %>%
   step_dummy(all_nominal_predictors()) %>%
   step_normalize(starts_with(c("sum", "mean")), -all_date_predictors(), -all_outcomes()) %>%
-  step_poly(all_numeric_predictors(), -starts_with(c("seasons", "holiday")), degree = 2) %>%
-  prep(training=rental_train) %>%
-  bake(rental_train)
+  step_poly(all_numeric_predictors(), -starts_with(c("seasons", "holiday")), degree = 2) #%>%
+#  prep(training=rental_train) %>%
+#  bake(rental_train)
 
-bike_rec3
+#bike_rec3
 ```
 
+Next, we'll create our model using the `lm` engine:
+```{r}
+rentalMod <- linear_reg() %>%
+  #use "lm", or linear model engine for model fitting
+  set_engine("lm")
+```
 
+Next, we'll create flow to fit the model and out put tidy estimates of the parameters:
+```{r}
+#create workflow for recipe 1 that starts with the recipe and fits the preprocessed data through the model engine specified in "rentalMod" object.
+rental_wfl_1 <- workflow() %>%
+  add_recipe(bike_rec1) %>%
+  add_model(rentalMod)
+#rental_wfl_1
+```
+Next well just fit Recipe 1 to test out our system:
+```{r}
+#this code initiates the fitting of the preprocessed data through the model on the training dataset
+rental_fit1 <- rental_wfl_1 %>%
+  fit(rental_train)
+rental_fit1 %>%
+  tidy()
+```
 
+We'll do 10 fold CV on the training data:
+```{r}
+#split the training dataset into 10 folds
+rental_10_fold_1 <- vfold_cv(rental_train, 10)
+#resample each of the 10 folds and put the specified workflow
+rental_CV_fits_1 <- rental_wfl_1 %>%
+  fit_resamples(rental_10_fold_1)
+rental_CV_fits_1
+```
+Next we'll get the metrics:
+```{r}
+rental_CV_fits_1 %>%
+  collect_metrics()
+```
+Now, we'll repeat starting from the workflow step for each recipe.  First, workflow for recipe 2, fit model, then do 10-fold CV on test dataset, then get metrics for each model:
+```{r}
+#create workflow for recipe 2
+rental_wfl_2 <- workflow() %>%
+  add_recipe(bike_rec2) %>%
+  add_model(rentalMod)
+rental_wfl_2
 
+#create workflow for recipe 3
+rental_wfl_3 <- workflow() %>%
+  add_recipe(bike_rec3) %>%
+  add_model(rentalMod)
+rental_wfl_3
+
+#fit model 2
+rental_fit2 <- rental_wfl_2 %>%
+  fit(rental_train)
+rental_fit2 %>%
+  tidy()
+
+#fit model 3
+rental_fit3 <- rental_wfl_3 %>%
+  fit(rental_train)
+rental_fit3 %>%
+  tidy()
+
+#10-fold CV recipe 2
+rental_10_fold_2 <- vfold_cv(rental_train, 10)
+rental_CV_fits_2 <- rental_wfl_2 %>%
+  fit_resamples(rental_10_fold_2)
+rental_CV_fits_2
+
+#10-fold CV recipe 3
+rental_10_fold_3 <- vfold_cv(rental_train, 10)
+rental_CV_fits_3 <- rental_wfl_3 %>%
+  fit_resamples(rental_10_fold_3)
+rental_CV_fits_3
+```
+
+Here, we'll display the metrics for recipe 2:
+```{r}
+rental_CV_fits_2 %>%
+  collect_metrics()
+```
+
+...And for recipe 3:
+```{r}
+rental_CV_fits_3 %>%
+  collect_metrics()
+```
+Recipe 2 has the lowest RMSE and highest R-squared.
+
+We'll use the "best" model on the test dataset and see how it fares:
+```{r}
+#use last_fit() function to collect metrics from recipe/model 2 and display
+testResults <- last_fit(rental_wfl_2, split = rental_split)
+collect_metrics(testResults)
+```
+RMSE for test dataset is 3339.891 with r-squared of 0.8928.  These values seem to match closely to the estimates from the training dataset using recipe 2.
 
 
